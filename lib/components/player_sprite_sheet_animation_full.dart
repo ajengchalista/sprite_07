@@ -1,12 +1,14 @@
-import 'package:flame/sprite.dart';
-import 'package:flame/flame.dart';
 import 'package:flame/components.dart';
+import 'package:flame/events.dart';
+import 'package:flame/flame.dart';
+import 'package:flame/sprite.dart';
 import 'package:flutter/services.dart';
 import 'package:sprite_07/utils/create_animation_by_limit.dart';
 
-class PlayerSpriteSheetComponentAnimationFull extends SpriteAnimationComponent 
-    with HasGameReference,KeyboardHandler {  
-  
+class PlayerSpriteSheetComponentAnimationFull extends SpriteAnimationComponent
+    with HasGameReference, KeyboardHandler, TapCallbacks {
+  // Menambahkan TapDetector
+
   late double screenWidth;
   late double screenHeight;
 
@@ -15,14 +17,6 @@ class PlayerSpriteSheetComponentAnimationFull extends SpriteAnimationComponent
 
   final double spriteSheetWidth = 680;
   final double spriteSheetHeight = 472;
-  final double speed = 500; //kecepatan bergerak
-  Vector2 velocity = Vector2.zero(); //gambar bergerak
-  double direction = 1; // kanan kiri
-  
-  bool isMoving = false;  // TAMBAHKAN VARIABEL INI
-
-
-  bool isTabPressed = false; // Untuk mencegah
 
   late SpriteAnimation deadAnimation;
   late SpriteAnimation idleAnimation;
@@ -30,82 +24,111 @@ class PlayerSpriteSheetComponentAnimationFull extends SpriteAnimationComponent
   late SpriteAnimation runAnimation;
   late SpriteAnimation walkAnimation;
 
+  bool isMovingLeft = false;
+  bool isMovingRight = false;
+
   @override
-  void onLoad() async {
-    final spriteImages = await Flame.images.load('dinofull.png');
-    final spriteSheet = SpriteSheet(image: spriteImages, srcSize: Vector2(spriteSheetWidth, spriteSheetHeight));
-
-    //Animations created
-    deadAnimation = spriteSheet.createAnimationByLimit(xInit: 0, yInit: 0, step: 8, sizeX: 5, stepTime: .08);
-    idleAnimation = spriteSheet.createAnimationByLimit(xInit: 1, yInit: 2, step: 10, sizeX: 5, stepTime: .08);
-    jumpAnimation = spriteSheet.createAnimationByLimit(xInit: 3, yInit: 2, step: 12, sizeX: 5, stepTime: .08);
-    runAnimation = spriteSheet.createAnimationByLimit(xInit: 1, yInit: 4, step: 8, sizeX: 5, stepTime: .08);
-    walkAnimation = spriteSheet.createAnimationByLimit(xInit: 6, yInit: 2, step: 10, sizeX: 5, stepTime: .08);
-    //End
-
-    animation = runAnimation;
+  Future<void> onLoad() async {
+    super.onLoad();
+    final spriteImage = await Flame.images.load('dinofull.png');
+    final spriteSheet = SpriteSheet(
+      image: spriteImage,
+      srcSize: Vector2(spriteSheetWidth, spriteSheetHeight),
+    );
 
     screenWidth = game.size.x;
     screenHeight = game.size.y;
 
     size = Vector2(spriteSheetWidth, spriteSheetHeight);
 
-    centerX = (screenWidth/2)-(spriteSheetWidth/2);
-    centerY = (screenHeight/2)-(spriteSheetHeight/2);
+    centerX = (screenWidth / 2) - (spriteSheetWidth / 2);
+    centerY = (screenHeight / 2) - (spriteSheetHeight / 2);
 
     position = Vector2(centerX, centerY);
+
+    // Mendefinisikan animasi untuk berbagai kondisi
+    deadAnimation = spriteSheet.createAnimationByLimit(
+      xInit: 0,
+      yInit: 0,
+      step: 8,
+      sizeX: 5,
+      stepTime: .08,
+    );
+    idleAnimation = spriteSheet.createAnimationByLimit(
+      xInit: 1,
+      yInit: 2,
+      step: 10,
+      sizeX: 5,
+      stepTime: .08,
+    );
+    jumpAnimation = spriteSheet.createAnimationByLimit(
+      xInit: 3,
+      yInit: 0,
+      step: 12,
+      sizeX: 5,
+      stepTime: .08,
+    );
+    runAnimation = spriteSheet.createAnimationByLimit(
+      xInit: 5,
+      yInit: 0,
+      step: 8,
+      sizeX: 5,
+      stepTime: .08,
+    );
+    walkAnimation = spriteSheet.createAnimationByLimit(
+      xInit: 6,
+      yInit: 2,
+      step: 10,
+      sizeX: 5,
+      stepTime: .08,
+    );
+
+    animation = idleAnimation; // Menetapkan animasi awal
   }
 
   @override
   void update(double dt) {
     super.update(dt);
-    
-    // Update posisi berdasarkan velocity
-    position += velocity * dt;
-    
-    // Batasi agar tidak keluar dari layar
-    position.x = position.x.clamp((width/2) -50 , (screenWidth - (width/2)) +50);
-    
-    // Update animasi berdasarkan state
-    if (isMoving) {
-      if (animation != walkAnimation) {
-        animation = walkAnimation;
-      }
-    } else {
-      if (animation != idleAnimation) {
-        animation = idleAnimation;
-      }
-    }
-    
-    // Flip sprite berdasarkan direction
-    if (direction == -1) {
-      // Menghadap kiri
+
+    // Mengatur pergerakan berdasarkan keyboard
+    if (isMovingLeft) {
       scale.x = -1;
-    } else {
-      // Menghadap kanan
+      animation = runAnimation;
+      position.x -= 100 * dt; // Bergerak ke kiri
+    } else if (isMovingRight) {
       scale.x = 1;
+      animation = runAnimation;
+      position.x += 100 * dt; // Bergerak ke kanan
     }
   }
 
   @override
   bool onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
-    isMoving = false;
-    velocity.x = 0;
-
-    // Cek tombol yang ditekan
     if (keysPressed.contains(LogicalKeyboardKey.arrowLeft)) {
-      velocity.x = -speed;
-      direction = -1; // Menghadap kiri
-      isMoving = true;
+      isMovingLeft = true;
+    } else if (keysPressed.contains(LogicalKeyboardKey.arrowRight)) {
+      isMovingRight = true;
+    } else {
+      isMovingLeft = false;
+      isMovingRight = false;
     }
-    
-    if (keysPressed.contains(LogicalKeyboardKey.arrowRight)) {
-      velocity.x = speed;
-      direction = 1; // Menghadap kanan
-      isMoving = true;
-    }
+    return false;
+  }
 
-    return true;
+  // Menangani tap pada objek dino
+  @override
+  void onTapDown(TapDownEvent event) {
+    super.onTapDown(event);
+
+    // Ganti animasi menjadi dead saat dino di-tap
+    if (animation == idleAnimation) {
+      animation = runAnimation;
+    } else if (animation == runAnimation) {
+      animation = deadAnimation;
+    } else if (animation == deadAnimation) {
+      animation = idleAnimation;
+    } else {
+      animation = idleAnimation;
+    }
   }
 }
-// done
